@@ -14,13 +14,25 @@ from langchain.prompts import PromptTemplate
 import streamlit as st
 
 # Function to load data from MongoDB
-def loadDataFromMongo(mongo_url='mongodb://localhost:27017/', db_name='gradhack', collection_name='discovery'):
+def loadDataFromMongo(mongo_url='mongodb+srv://Tumi:MKKBOI005@gradhack.gl0y9h3.mongodb.net/', db_name='gradhack', collection_name='discovery'):
     client = MongoClient(mongo_url)
     db = client[db_name]
     collection = db[collection_name]
     documents = collection.find()
     data = list(documents)
     return data
+
+# Uploads simple text to mongoDB
+def uploadDataToMongo(question, answer, mongo_url='mongodb+srv://Tumi:MKKBOI005@gradhack.gl0y9h3.mongodb.net/', db_name='gradhack', collection_name='feedback'):
+    client = MongoClient(mongo_url)
+    db = client[db_name]
+    collection = db[collection_name]
+    document = {"type": "plain_text",
+                "question": question,
+                "answer" : answer}
+    result = collection.insert_one(document)
+    print("Chat uploaded to MongoDB", result)
+
 
 # Define the SimpleDocument class
 class SimpleDocument:
@@ -76,12 +88,12 @@ os.environ["OPENAI_API_KEY"] = 'sk-proj-p8hPKdKoqa47EfoL9rseT3BlbkFJeGMEqlVBHvcY
 embedding = OpenAIEmbeddings()
 persist_directory = 'docs/chroma/'
 
-# Uncomment the following lines if you need to create the vector store for the first time
+#Uncomment the following lines if you need to create the vector store for the first time
 # vectordb = Chroma.from_documents(
-#     documents=splits,
-#     embedding=embedding,
-#     persist_directory=persist_directory
-# )
+#      documents=splits,
+#      embedding=embedding,
+#      persist_directory=persist_directory
+#  )
 # print(vectordb._collection.count())
 
 # Load the vector store if embeddings are already stored
@@ -146,13 +158,14 @@ st.title("Financial Advisor Chatbot")
 # Input box for the user's question
 user_question = st.text_input("Ask a financial question:")
 
+# 'Get Answer' Button
 if st.button("Get Answer"):
     if user_question:
         result = qa_chain({"query": user_question})
         st.write("Answer:", result['result'])
+        uploadDataToMongo(user_question, result['result']) # to store feedback
         if 'source_documents' in result:
             st.write("Source Document:", result['source_documents'][0].page_content)
     else:
         st.write("Please enter a question.")
-
 
