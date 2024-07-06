@@ -12,6 +12,8 @@ from langchain.chains import RetrievalQA
 from langchain.memory import ConversationBufferMemory
 from langchain.prompts import PromptTemplate
 import streamlit as st
+from PIL import Image
+import numpy as np
 
 # Function to load data from MongoDB
 def loadDataFromMongo(mongo_url='mongodb+srv://Tumi:MKKBOI005@gradhack.gl0y9h3.mongodb.net/', db_name='gradhack', collection_name='discovery'):
@@ -49,6 +51,13 @@ def filter_complex_metadata(metadata):
         elif isinstance(value, bson.ObjectId):
             filtered_metadata[key] = str(value)  # Convert ObjectId to string
     return filtered_metadata
+
+# helper function to remove square bracket category from response
+def remove_brackets(text):
+    start_bracket = text.rfind('[')
+    if start_bracket != -1:
+        return text[:start_bracket].rstrip()
+    return text
 
 # Load data from MongoDB
 data = loadDataFromMongo()
@@ -115,6 +124,9 @@ Always elborate in your answers and tell the user why you came up with the concl
 Always answer me like you are giving me advice not general advice. Like I am getting personal advice from
 my financial advisor. Use words like "you".
 Use the following context (delimited by <ctx></ctx>) and the chat history (delimited by <hs></hs>) to answer the question:
+
+At the end of each asnwer categorize the topic of the question into one of the following topics and add this topic as
+a single word to the end of your answer [Savings, investment plan, Spending habits, Discovery Card plans, other]
 ------
 <ctx>
 {context}
@@ -131,6 +143,8 @@ prompt = PromptTemplate(
     input_variables=["history", "context", "question"],
     template=template,
 )
+
+
 
 # Initialize Streamlit session state for memory
 if 'memory' not in st.session_state:
@@ -152,15 +166,30 @@ qa_chain = RetrievalQA.from_chain_type(
     }
 )
 
+
+
 # Streamlit UI
 st.title("Financial Advisor Chatbot 💬")
+
 
 if "messages" not in st.session_state:
     st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
 
-for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
+#assistant logo
+logo_path = "Logo.png"
 
+def display_chat_message(role, content):
+    if role == "assistant":
+        col1, col2 = st.columns([1, 9])
+        with col1:
+            st.image(logo_path, width=40)
+        with col2:
+            st.markdown(content)
+    else:
+        st.chat_message(role).write(content)
+
+for msg in st.session_state.messages:
+    display_chat_message(msg["role"], msg["content"])
 
 if user_input := st.chat_input():
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -169,14 +198,10 @@ if user_input := st.chat_input():
 if "messages" in st.session_state and st.session_state.messages[-1]["role"] == "user":
     user_question = st.session_state.messages[-1]["content"]
     response = qa_chain({"query": user_question})
-    st.session_state.messages.append({"role": "assistant", "content": response['result']})
+    uploadDataToMongo(user_question, response['result']) # to store feedback
+    output_string = remove_brackets(response['result'])
+    st.session_state.messages.append({"role": "assistant", "content": output_string})
     st.experimental_rerun()  # Force the app to rerun so the assistant's response appears immediately
 
-# if user_input := st.chat_input():
-#     user_question = user_input
-#     response = qa_chain({"query": user_question})
-#     st.session_state.messages.append({"role": "assistant", "content": response['result']})
-#     st.chat_message("assistant").write(response['result'])
-#     st.session_state.messages.append({"role": "user", "content": user_input})
 
 
