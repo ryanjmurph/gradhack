@@ -14,9 +14,13 @@ from langchain.prompts import PromptTemplate
 import streamlit as st
 from PIL import Image
 import numpy as np
+import matplotlib.pyplot as plt
+
+# Set Streamlit page configuration
+st.set_page_config(page_title="Financial Advisor Chatbot", page_icon="💬")
 
 # Function to load data from MongoDB
-def loadDataFromMongo(mongo_url='mongodb://localhost:27017/', db_name='gradhack', collection_name='discovery'):
+def loadDataFromMongo(mongo_url='mongodb://localhost:27017/', db_name='demo', collection_name='discovery'):
     client = MongoClient(mongo_url)
     db = client[db_name]
     collection = db[collection_name]
@@ -25,7 +29,7 @@ def loadDataFromMongo(mongo_url='mongodb://localhost:27017/', db_name='gradhack'
     return data
 
 # Uploads simple text to mongoDB
-def uploadDataToMongo(question, answer, type, mongo_url='mongodb://localhost:27017/', db_name='gradhack', collection_name='interactions'):
+def uploadDataToMongo(question, answer, type, mongo_url='mongodb://localhost:27017/', db_name='demo', collection_name='interactions'):
     client = MongoClient(mongo_url)
     db = client[db_name]
     collection = db[collection_name]
@@ -156,7 +160,7 @@ my financial advisor. Use words like "you".
 Use the following context (delimited by <ctx></ctx>) and the chat history (delimited by <hs></hs>) to answer the question:
 
 At the end of each answer categorize the topic of the question into one of the following topics and add this topic as
-a single word to the end of your answer [Savings, Investment Plan, Spending Habits, Discovery Card Plans, Other]
+a single word to the end of your answer [Savings, Investment Plan, Spending Habits, Discovery Card Plans, Plot, Other]
 ------
 <ctx>
 {context}
@@ -181,7 +185,6 @@ if 'memory' not in st.session_state:
 # Update memory in session state to use in the chain
 memory = st.session_state.memory
 
-# Create the RetrievalQA chain with context and history retention
 qa_chain = RetrievalQA.from_chain_type(
     llm=llm,
     chain_type='stuff',
@@ -194,11 +197,7 @@ qa_chain = RetrievalQA.from_chain_type(
     }
 )
 
-# Streamlit UI
-st.set_page_config(page_title="Financial Advisor Chatbot", page_icon="💬")
-
-# Discovery logo at the top left
-logo_path = "logo.png"  # Ensure this is the correct path to your logo file
+logo_path = "logo.png"  
 st.sidebar.image(logo_path, width=100)
 
 st.title("Financial Advisor Chatbot 💬")
@@ -225,23 +224,31 @@ st.sidebar.subheader("Transactions")
 st.sidebar.write(transactions)
 
 if "messages" not in st.session_state:
-    st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
+    st.session_state["messages"] = [{"role": "assistant", "type": "text", "content": "How can I help you?"}]
+if "show_plot" not in st.session_state:
+    st.session_state["show_plot"] = False
 
-def display_chat_message(role, content):
+def display_chat_message(role, msg_type, content):
     if role == "assistant":
         col1, col2 = st.columns([1, 9])
         with col1:
             st.image(logo_path, width=40)
         with col2:
-            st.markdown(content)
+            if msg_type == "text":
+                st.markdown(content)
+            elif msg_type == "image":
+                st.image(content)
     else:
-        st.chat_message(role).write(content)
+        if msg_type == "text":
+            st.chat_message(role).write(content)
+        elif msg_type == "image":
+            st.image(content)
 
 for msg in st.session_state.messages:
-    display_chat_message(msg["role"], msg["content"])
+    display_chat_message(msg["role"], msg["type"], msg["content"])
 
 if user_input := st.chat_input():
-    st.session_state.messages.append({"role": "user", "content": user_input})
+    st.session_state.messages.append({"role": "user", "type": "text", "content": user_input})
     st.experimental_rerun()  # Force the app to rerun so the user's message appears immediately
 
 if "messages" in st.session_state and st.session_state.messages[-1]["role"] == "user":
@@ -251,5 +258,15 @@ if "messages" in st.session_state and st.session_state.messages[-1]["role"] == "
     typeText = get_text_in_brackets(response['result'])
     uploadDataToMongo(user_question, response['result'], type=typeText)  # to store feedback
     output_string = remove_brackets(response['result'])
-    st.session_state.messages.append({"role": "assistant", "content": output_string})
-    st.experimental_rerun()  # Force the app to rerun so the assistant's response appears immediately
+    
+    if typeText == "Plot":
+        st.session_state.show_plot = True
+        st.session_state.messages.append({"role": "assistant", "type": "image", "content": "plot.png"})
+    else:
+        st.session_state.show_plot = False
+        st.session_state.messages.append({"role": "assistant", "type": "text", "content": output_string})
+    
+    st.experimental_rerun()
+
+#if st.session_state.show_plot:
+#    st.image("plot.png", caption="Account Balance Over Time")
