@@ -15,12 +15,13 @@ import streamlit as st
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
+from emailer import Email
 
 # Set Streamlit page configuration
 st.set_page_config(page_title="Financial Advisor Chatbot", page_icon="💬")
 
 # Function to load data from MongoDB
-def loadDataFromMongo(mongo_url='mongodb://localhost:27017/', db_name='demo', collection_name='discovery'):
+def loadDataFromMongo(mongo_url='mongodb://localhost:27017/', db_name='gradhack', collection_name='discovery'):
     client = MongoClient(mongo_url)
     db = client[db_name]
     collection = db[collection_name]
@@ -28,7 +29,7 @@ def loadDataFromMongo(mongo_url='mongodb://localhost:27017/', db_name='demo', co
     data = list(documents)
     return data
 
-# Uploads simple text to mongoDB
+
 def uploadDataToMongo(question, answer, type, mongo_url='mongodb://localhost:27017/', db_name='demo', collection_name='interactions'):
     client = MongoClient(mongo_url)
     db = client[db_name]
@@ -40,6 +41,7 @@ def uploadDataToMongo(question, answer, type, mongo_url='mongodb://localhost:270
     }
     result = collection.insert_one(document)
     print("Chat uploaded to MongoDB", result)
+
 
 # Define the SimpleDocument class
 class SimpleDocument:
@@ -74,7 +76,6 @@ def get_text_in_brackets(text):
 
 # Load data from MongoDB
 data = loadDataFromMongo()
-print(data)
 
 # Extract transactions from the content
 def extract_transactions(content):
@@ -120,7 +121,7 @@ os.environ["OPENAI_API_KEY"] = 'sk-proj-p8hPKdKoqa47EfoL9rseT3BlbkFJeGMEqlVBHvcY
 
 # Create the vector store
 embedding = OpenAIEmbeddings()
-persist_directory = 'chromadb2/chroma/'
+persist_directory = 'ddb/chroma/'
 
 vectordb = Chroma.from_documents(
     documents=splits,
@@ -131,7 +132,6 @@ vectordb = Chroma.from_documents(
 
 # Load the vector store if embeddings are already stored
 vectordb = Chroma(persist_directory=persist_directory, embedding_function=embedding)
-print(vectordb._collection.count())
 
 # Initialize the language model
 llm_name = "gpt-3.5-turbo"
@@ -223,6 +223,21 @@ transactions = """15th Jan 2024: -R100 on groceries\n
 st.sidebar.subheader("Transactions")
 st.sidebar.write(transactions)
 
+if st.sidebar.button("Email"):
+    user_question = """Give me an overall run down of my finances, 
+    how im doing in reaching my savings goals. Also mention my investments in stocks and how they have done.
+    Write a paragraph for the finance rundown and another for the investments
+    Do not mention my investments in the first paragraph just my transactions.
+    In the second paragprah only mention my investments
+     Write as much as you can.
+    """
+    response = qa_chain({"query": user_question})
+    email_client = Email()
+    print(response['result'], " THis is the result")
+
+    image_paths = ['investments_plot.png', 'plot.png']  # Replace with your actual image paths
+
+    email_client.send_email(response['result'], image_paths)
 if "messages" not in st.session_state:
     st.session_state["messages"] = [{"role": "assistant", "type": "text", "content": "How can I help you?"}]
 if "show_plot" not in st.session_state:
@@ -254,7 +269,7 @@ if user_input := st.chat_input():
 if "messages" in st.session_state and st.session_state.messages[-1]["role"] == "user":
     user_question = st.session_state.messages[-1]["content"]
     response = qa_chain({"query": user_question})
-    print(response['result'])
+    print(response['result'], "RESULT")
     typeText = get_text_in_brackets(response['result'])
     uploadDataToMongo(user_question, response['result'], type=typeText)  # to store feedback
     output_string = remove_brackets(response['result'])
