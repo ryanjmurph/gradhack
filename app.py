@@ -15,10 +15,16 @@ import streamlit as st
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
-from emailer import Email
+import email as Email
+from streamlit_feedback import streamlit_feedback
+
+# Streamlit functions
+def close_chat():
+    st.write("chat session closed")
 
 # Set Streamlit page configuration
 st.set_page_config(page_title="Financial Advisor Chatbot", page_icon="💬")
+
 
 # Function to load data from MongoDB
 def loadDataFromMongo(mongo_url='mongodb://localhost:27017/', db_name='gradhack', collection_name='discovery'):
@@ -27,20 +33,21 @@ def loadDataFromMongo(mongo_url='mongodb://localhost:27017/', db_name='gradhack'
     collection = db[collection_name]
     documents = collection.find()
     data = list(documents)
+    client.close()
     return data
 
-
-def uploadDataToMongo(question, answer, type, mongo_url='mongodb://localhost:27017/', db_name='demo', collection_name='interactions'):
+def uploadDataToMongo(question, answer, category, mongo_url='mongodb://localhost:27017/', db_name='gradhack', collection_name='interactions'):
     client = MongoClient(mongo_url)
     db = client[db_name]
     collection = db[collection_name]
     document = {
-        "type": type,
+        "category": category,
         "question": question,
         "answer": answer
     }
     result = collection.insert_one(document)
     print("Chat uploaded to MongoDB", result)
+    client.close()
 
 
 # Define the SimpleDocument class
@@ -123,11 +130,12 @@ os.environ["OPENAI_API_KEY"] = 'sk-proj-p8hPKdKoqa47EfoL9rseT3BlbkFJeGMEqlVBHvcY
 embedding = OpenAIEmbeddings()
 persist_directory = 'ddb/chroma/'
 
-vectordb = Chroma.from_documents(
-    documents=splits,
-    embedding=embedding,
-    persist_directory=persist_directory
-)
+# Create new vector store if no embeddings are already stored
+# vectordb = Chroma.from_documents(
+#     documents=splits,
+#     embedding=embedding,
+#     persist_directory=persist_directory
+# )
 # print(vectordb._collection.count())
 
 # Load the vector store if embeddings are already stored
@@ -199,9 +207,7 @@ qa_chain = RetrievalQA.from_chain_type(
 
 logo_path = "logo.png"  
 st.sidebar.image(logo_path, width=100)
-
-st.title("Financial Advisor Chatbot 💬")
-
+st.title("Financial Advisor Chatbot 💬", )
 transactions = """15th Jan 2024: -R100 on groceries\n
 10th Feb 2024: Deposited R500 (paycheck)\n
 10th Feb 2024: -R150 on dinner\n
@@ -238,6 +244,39 @@ if st.sidebar.button("Email"):
     image_paths = ['investments_plot.png', 'plot.png']  # Replace with your actual image paths
 
     email_client.send_email(response['result'], image_paths)
+
+# Close chat functions
+
+# instantiate session variables
+if 'rating' not in st.session_state:
+    st.session_state.rating = 1
+if 'feedback' not in st.session_state:
+    st.session_state.feedback = ""
+
+# Function to upload back to mongo
+def uploadFeedback(mongo_url='mongodb://localhost:27017/', db_name='gradhack', collection_name='feedback'):
+    client = MongoClient(mongo_url)
+    db = client[db_name]
+    collection = db[collection_name]
+    document = {
+        "rating": st.session_state.rating,
+        "comment": st.session_state.feedback
+    }
+    result = collection.insert_one(document)
+    print("Feedback uploaded to MongoDB", result)
+    client.close()
+
+
+if st.sidebar.button("Close Chat"):
+    st.sidebar.write("Thank you for using the chat")
+    with st.sidebar.form("feedback_form"):
+        st.write("we would love to hear your feedback")
+        st.slider("Rate your experience",1,10, key = 'rating')
+        st.text_area("Any Comments or suggestions?", key = 'feedback')
+        st.form_submit_button("Submit", on_click = uploadFeedback)
+
+
+
 if "messages" not in st.session_state:
     st.session_state["messages"] = [{"role": "assistant", "type": "text", "content": "How can I help you?"}]
 if "show_plot" not in st.session_state:
@@ -271,7 +310,7 @@ if "messages" in st.session_state and st.session_state.messages[-1]["role"] == "
     response = qa_chain({"query": user_question})
     print(response['result'], "RESULT")
     typeText = get_text_in_brackets(response['result'])
-    uploadDataToMongo(user_question, response['result'], type=typeText)  # to store feedback
+    uploadDataToMongo(user_question, response['result'], category = typeText)  # to store feedback
     output_string = remove_brackets(response['result'])
     
     if typeText == "Plot":
@@ -282,6 +321,7 @@ if "messages" in st.session_state and st.session_state.messages[-1]["role"] == "
         st.session_state.messages.append({"role": "assistant", "type": "text", "content": output_string})
     
     st.experimental_rerun()
+
 
 #if st.session_state.show_plot:
 #    st.image("plot.png", caption="Account Balance Over Time")
