@@ -15,8 +15,9 @@ import streamlit as st
 from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
-import email as Email
+from emailer import Email
 from streamlit_feedback import streamlit_feedback
+from plotter import Plotter
 
 # Streamlit functions
 def close_chat():
@@ -83,6 +84,7 @@ def get_text_in_brackets(text):
 
 # Load data from MongoDB
 data = loadDataFromMongo()
+print(data)
 
 # Extract transactions from the content
 def extract_transactions(content):
@@ -131,18 +133,18 @@ embedding = OpenAIEmbeddings()
 persist_directory = 'ddb/chroma/'
 
 # Create new vector store if no embeddings are already stored
-# vectordb = Chroma.from_documents(
-#     documents=splits,
-#     embedding=embedding,
-#     persist_directory=persist_directory
-# )
+vectordb = Chroma.from_documents(
+    documents=splits,
+    embedding=embedding,
+    persist_directory=persist_directory
+)
 # print(vectordb._collection.count())
 
 # Load the vector store if embeddings are already stored
 vectordb = Chroma(persist_directory=persist_directory, embedding_function=embedding)
 
 # Initialize the language model
-llm_name = "gpt-3.5-turbo"
+llm_name = "gpt-4o"
 llm = ChatOpenAI(model_name=llm_name, temperature=0)
 
 # Define the prompt template for the QA chain
@@ -156,6 +158,7 @@ Only answer questions if they pertain to finance and only include answers that h
 If the context does not contain enough information or you are unsure of the answer, clearly state that you don't know.
 Three sentence responses are enough. 
 When referring to James Joyce, please always use information from his account as context.
+Try to mention Vitality Points when asked about their financial situation
 Please talk to me as if I am James Joyce. So when I ask you questions pretend you are talking to James Joyce
 and use his information as mine.
 When I ask questions about how James Joyce can cut down on expenses please refer to his account transactions and 
@@ -168,7 +171,8 @@ my financial advisor. Use words like "you".
 Use the following context (delimited by <ctx></ctx>) and the chat history (delimited by <hs></hs>) to answer the question:
 
 At the end of each answer categorize the topic of the question into one of the following topics and add this topic as
-a single word to the end of your answer [Savings, Investment Plan, Spending Habits, Discovery Card Plans, Plot, Other]
+a single word to the end of your answer [Savings, Investment Plan, Spending Habits, Discovery Card Plans,
+Transaction Plot, Investment Plot, Other] 
 ------
 <ctx>
 {context}
@@ -241,7 +245,15 @@ if st.sidebar.button("Email"):
     email_client = Email()
     print(response['result'], " THis is the result")
 
-    image_paths = ['investments_plot.png', 'plot.png']  # Replace with your actual image paths
+    plotter = Plotter()
+
+    plot_result_investments = plotter.plot_investments("Jamesjoyce123@gmail.com", save_path="investments_plot.png")
+    print(plot_result_investments)
+
+    plot_result_balance = plotter.plot_account_balance("Jamesjoyce123@gmail.com", save_path="balance_plot.png")
+    print(plot_result_balance)
+
+    image_paths = ['investments_plot.png', 'balance_plot.png']
 
     email_client.send_email(response['result'], image_paths)
 
@@ -313,9 +325,12 @@ if "messages" in st.session_state and st.session_state.messages[-1]["role"] == "
     uploadDataToMongo(user_question, response['result'], category = typeText)  # to store feedback
     output_string = remove_brackets(response['result'])
     
-    if typeText == "Plot":
+    if typeText == "Transaction Plot":
         st.session_state.show_plot = True
-        st.session_state.messages.append({"role": "assistant", "type": "image", "content": "plot.png"})
+        st.session_state.messages.append({"role": "assistant", "type": "image", "content": "balance_plot.png"})
+    elif typeText == "Investment Plot":
+        st.session_state.show_plot = True
+        st.session_state.messages.append({"role": "assistant", "type": "image", "content": "investments_plot.png"})   
     else:
         st.session_state.show_plot = False
         st.session_state.messages.append({"role": "assistant", "type": "text", "content": output_string})
