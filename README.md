@@ -1,4 +1,3 @@
-<br>
 <img src="logo.png" alt="DLOGs" width="400"/>
 
 # Discovery Gradhack 2024 Silicon Slippers
@@ -12,6 +11,8 @@ We implemented analytics and emailing features for execs at the bank to find out
 It uses Mongo, Chroma and Langchain as the drivers for the project.
 
 Here is our problem statement:
+
+
 <img src="problem_statement.png" alt="Silicon Slippers" width="400"/>
 
 
