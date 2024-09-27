@@ -51,7 +51,6 @@ def uploadDataToMongo(question, answer, category, mongo_url='mongodb://localhost
     client.close()
 
 
-# Define the SimpleDocument class
 class SimpleDocument:
     def __init__(self, text, metadata=None):
         self.page_content = text
@@ -97,12 +96,11 @@ def extract_transactions(content):
 transactions = []
 docs = []
 for doc in data:
-    if 'content' in doc:  # Assuming 'content' field contains the text data
+    if 'content' in doc:  
         filtered_metadata = filter_complex_metadata(doc)
         docs.append(SimpleDocument(text=doc['content'], metadata=filtered_metadata))
         transactions.extend(extract_transactions(doc['content']))
     else:
-        # Process structured client data
         content = f"Client Name: {doc.get('name', 'N/A')}\n"
         content += f"Client Age: {doc.get('age', 'N/A')}\n"
         content += f"Client Address: {doc.get('address', 'N/A')}\n"
@@ -116,21 +114,19 @@ for doc in data:
         filtered_metadata = filter_complex_metadata(doc)
         docs.append(SimpleDocument(text=content, metadata=filtered_metadata))
 
-# Text splitter to handle large documents
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=1500,
     chunk_overlap=150
 )
 
-# Create splits of the documents using the text splitter
 splits = text_splitter.split_documents(docs)
 
 # Initialize the OpenAI API key
-os.environ["OPENAI_API_KEY"] = 'sk-proj-p8hPKdKoqa47EfoL9rseT3BlbkFJeGMEqlVBHvcYEUzRYZdR'
+os.environ["OPENAI_API_KEY"] = 'your key'
 
 # Create the vector store
 embedding = OpenAIEmbeddings()
-persist_directory = 'ddb/chroma/'
+persist_directory = 'db/chroma/'
 
 # Create new vector store if no embeddings are already stored
 vectordb = Chroma.from_documents(
@@ -158,11 +154,8 @@ Only answer questions if they pertain to finance and only include answers that h
 If the context does not contain enough information or you are unsure of the answer, clearly state that you don't know.
 Three sentence responses are enough. 
 When referring to James Joyce, please always use information from his account as context.
-Try to mention Vitality Points when asked about their financial situation
 Please talk to me as if I am James Joyce. So when I ask you questions pretend you are talking to James Joyce
 and use his information as mine.
-When I ask questions about how James Joyce can cut down on expenses please refer to his account transactions and 
-identify expenses that are non-essential like parties or coffees or dining out.
 Never make up information that does not exist in the db.
 Always prioritize the user's financial well-being and avoid making assumptions.
 Always elaborate in your answers and tell the user why you came up with the conclusion you came up with.
@@ -212,23 +205,11 @@ qa_chain = RetrievalQA.from_chain_type(
 logo_path = "logo.png"  
 st.sidebar.image(logo_path, width=100)
 st.title("Financial Advisor Chatbot 💬", )
-transactions = """15th Jan 2024: -R100 on groceries\n
-10th Feb 2024: Deposited R500 (paycheck)\n
-10th Feb 2024: -R150 on dinner\n
-12th Feb 2024: -R50 at a party\n
-15th Feb 2024: -R40 at a coffee shop\n
-17th Feb 2024: -R40 at a coffee shop\n
-18th Feb 2024: -R67 at a party\n
-20th Feb 2024: -R67 at a party\n
-24th Feb 2024: -R40 at a coffee shop\n
-1st Mar 2024: -R25 on dinner\n
-2nd Mar 2024: -R75 on BP petrol\n
-3rd Mar 2024: -R200 from an ATM\n
-10th Mar 2024: Refunded R150 for clothing\n
-15th Mar 2024: -R100 at a birthday party\n
-20th Mar 2024: -R150 at a dinner party\n
-21st Mar 2024: -R200 at a party\n
-31st Oct 2024: -R250 at a party"""
+transactions = """
+Transaction 1
+Transaction 2
+...
+"""
 
 st.sidebar.subheader("Transactions")
 st.sidebar.write(transactions)
@@ -257,9 +238,7 @@ if st.sidebar.button("Email"):
 
     email_client.send_email(response['result'], image_paths)
 
-# Close chat functions
 
-# instantiate session variables
 if 'rating' not in st.session_state:
     st.session_state.rating = 1
 if 'feedback' not in st.session_state:
@@ -286,8 +265,6 @@ if st.sidebar.button("Close Chat"):
         st.slider("Rate your experience",1,10, key = 'rating')
         st.text_area("Any Comments or suggestions?", key = 'feedback')
         st.form_submit_button("Submit", on_click = uploadFeedback)
-
-
 
 if "messages" not in st.session_state:
     st.session_state["messages"] = [{"role": "assistant", "type": "text", "content": "How can I help you?"}]
@@ -337,6 +314,3 @@ if "messages" in st.session_state and st.session_state.messages[-1]["role"] == "
     
     st.experimental_rerun()
 
-
-#if st.session_state.show_plot:
-#    st.image("plot.png", caption="Account Balance Over Time")

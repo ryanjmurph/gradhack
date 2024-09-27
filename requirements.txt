@@ -1,0 +1,10 @@
+langchain
+langchain-community
+openai
+pypdf2
+pymongo
+bson
+streamlit
+pillow
+numpy
+matplotlib
