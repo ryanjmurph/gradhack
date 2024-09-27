@@ -1,4 +1,3 @@
-<img src="logo.png" alt="DLOGs" width="400"/>
 
 # Discovery Gradhack 2024 Silicon Slippers
 # AI financial advisor 
